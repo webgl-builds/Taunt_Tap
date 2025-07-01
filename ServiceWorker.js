@@ -1,9 +1,9 @@
 const cacheName = "DefaultCompany-Taunt_Build_1-0.1.1";
 const contentToCache = [
-    "Build/Taunt_Tap.loader.js",
-    "Build/Taunt_Tap.framework.js",
-    "Build/Taunt_Tap.data",
-    "Build/Taunt_Tap.wasm",
+    "Build/Disk.loader.js",
+    "Build/Disk.framework.js.gz",
+    "Build/Disk.data.gz",
+    "Build/Disk.wasm.gz",
     "TemplateData/style.css"
 
 ];
