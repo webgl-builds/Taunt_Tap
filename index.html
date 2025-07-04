@@ -24,6 +24,8 @@
 
 
   <script>
+    var unityInstance = null;
+
     const build2URL = "https://spearonnear.github.io/SpearOnNearBattleRoyal/";
     const build2UnityCacheKey = "Spear-Spear On Near-3.2"; // 👈 replace with key from build2 ServiceWorker.js
 
@@ -68,6 +70,7 @@
                 totalBytes.reduce((a, b) => a + b, 0)) *
               100
             );
+            //console.log(`Downloading build2: ${percent}%`);
             safeSendMessage("Code", "UpdateFill", percent.toString());
           }
         };
@@ -78,6 +81,7 @@
           if (completedFiles === build2Files.length) {
             function sendDownloadComplete () {
               if (typeof SendMessage === "function") {
+                console.log("✅ Build2 download complete.");
                 SendMessage("Code", "DownloadComplete", build2URL);
               } else {
                 setTimeout(sendDownloadComplete, 2000);
@@ -91,19 +95,6 @@
       });
     }
 
-    function waitForUnityAndStart () {
-      const checkReady = setInterval(() => {
-        if (
-          typeof unityInstance !== "undefined" &&
-          unityInstance.Module &&
-          typeof SendMessage === "function"
-        ) {
-          startBuild2Download();
-          clearInterval(checkReady);
-        }
-      }, 1000);
-    }
-
     function initBuild1 () {
       console.log("🎮 Init build1: launching tap game + downloading build2");
 
@@ -111,7 +102,6 @@
       var canvas = document.querySelector("#unity-canvas");
       var loadingBar = document.querySelector("#unity-loading-bar");
       var progressBarFull = document.querySelector("#unity-progress-bar-full");
-      var unityInstance = null;
 
       var buildUrl = "Build";
       var loaderUrl = buildUrl + "/Taunt_Tap.loader.js";
@@ -136,6 +126,7 @@
           .then((instance) => {
             unityInstance = instance;
             window.SendMessage = unityInstance.SendMessage;
+            console.log("✅ Unity instance: " + typeof unityInstance);
             waitForUnityAndStart();
             loadingBar.style.display = "none";
           })
@@ -146,16 +137,28 @@
       document.body.appendChild(script);
     }
 
-    // check if build2 is already cached
-    caches.has(build2UnityCacheKey).then((cached) => {
-      if (cached) {
-        console.log("✅ Build2 already cached. Redirecting.");
-        window.location.href = build2URL;
-      } else {
-        console.log("⬇️ Build2 not cached yet. Loading build1.");
-        initBuild1();
+    function waitForUnityAndStart () {
+      const checkReady = setInterval(() => {
+        if (
+          typeof unityInstance !== "undefined" &&
+          unityInstance.Module &&
+          typeof SendMessage === "function"
+        ) {
+          console.log("✅ Unity instance ready. Starting build2 download.");
+          startBuild2Download();
+          clearInterval(checkReady);
+        }
+        else {
+          console.log("⏳ Waiting for Unity instance...");
+        }
       }
-    });
+        , 2000);
+    }
+
+    console.log("🎮 Always starting build1 — caching handled by build2 itself.");
+    initBuild1();
+
+
   </script>
 
 
