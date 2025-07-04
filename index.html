@@ -110,28 +110,60 @@
 
       function downloadAndCacheBuild2() {
         completedFiles = 0;
+        let loadedBytes = new Array(build2Files.length).fill(0);
+        let totalBytes = new Array(build2Files.length).fill(1);
 
         build2Files.forEach((url, idx) => {
           fetch(url)
             .then((response) => {
-              if (!response.ok) {
-                throw new Error(`Failed to fetch ${url}`);
+              if (!response.ok) throw new Error(`Failed to fetch ${url}`);
+
+              const contentLength = response.headers.get("Content-Length");
+              if (contentLength) totalBytes[idx] = parseInt(contentLength);
+
+              const reader = response.body.getReader();
+              const chunks = [];
+              let received = 0;
+
+              function read() {
+                return reader.read().then(({ done, value }) => {
+                  if (done) {
+                    const blob = new Blob(chunks);
+                    return caches
+                      .open(build2UnityCacheKey)
+                      .then((cache) => {
+                        cache.put(contentToCache[idx], new Response(blob));
+                      })
+                      .then(() => {
+                        completedFiles++;
+                        if (completedFiles === build2Files.length) {
+                          console.log(
+                            "✅ All build2 files downloaded & cached."
+                          );
+                          safeSendMessage(
+                            "Code",
+                            "DownloadComplete",
+                            build2URL
+                          );
+                        }
+                      });
+                  }
+                  received += value.length;
+                  loadedBytes[idx] = received;
+                  chunks.push(value);
+
+                  const percent = Math.round(
+                    (loadedBytes.reduce((a, b) => a + b, 0) /
+                      totalBytes.reduce((a, b) => a + b, 0)) *
+                      100
+                  );
+
+                  safeSendMessage("Code", "UpdateFill", percent.toString());
+                  return read();
+                });
               }
-              return caches.open(build2UnityCacheKey).then((cache) => {
-                return cache.put(contentToCache[idx], response.clone());
-              });
-            })
-            .then(() => {
-              completedFiles++;
-              const percent = Math.round(
-                (completedFiles / build2Files.length) * 100
-              );
-              safeSendMessage("Code", "UpdateFill", percent.toString());
-              console.log(`✅ Cached ${contentToCache[idx]}`);
-              if (completedFiles === build2Files.length) {
-                console.log("✅ All build2 files downloaded & cached.");
-                safeSendMessage("Code", "DownloadComplete", build2URL);
-              }
+
+              return read();
             })
             .catch((err) => {
               console.error(`Error caching ${url}:`, err);
