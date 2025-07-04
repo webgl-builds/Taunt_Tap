@@ -48,63 +48,6 @@
         }
       }
 
-      function startBuild2Download() {
-        loadedBytes = new Array(build2Files.length).fill(0);
-        totalBytes = new Array(build2Files.length).fill(1);
-        completedFiles = 0;
-
-        build2Files.forEach((fileUrl, idx) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open("GET", fileUrl, true);
-          xhr.responseType = "blob";
-
-          xhr.onprogress = function (e) {
-            if (e.lengthComputable) {
-              loadedBytes[idx] = e.loaded;
-              totalBytes[idx] = e.total;
-              const percent = Math.round(
-                (loadedBytes.reduce((a, b) => a + b, 0) /
-                  totalBytes.reduce((a, b) => a + b, 0)) *
-                  100
-              );
-              //console.log(`Downloading build2: ${percent}%`);
-              safeSendMessage("Code", "UpdateFill", percent.toString());
-            }
-          };
-
-          xhr.onload = function () {
-            completedFiles++;
-            loadedBytes[idx] = totalBytes[idx];
-
-            if (xhr.status === 200 && xhr.response) {
-              caches.open(build2UnityCacheKey).then((cache) => {
-                cache
-                  .put(contentToCache[idx], new Response(xhr.response))
-                  .then(() => {
-                    console.log(`✅ Cached: ${contentToCache[idx]}`);
-                  });
-              });
-            } else {
-              console.warn(`⚠️ Failed to download ${contentToCache[idx]}`);
-            }
-
-            if (completedFiles === build2Files.length) {
-              function sendDownloadComplete() {
-                if (typeof SendMessage === "function") {
-                  console.log("✅ Build2 download complete.");
-                  SendMessage("Code", "DownloadComplete", build2URL);
-                } else {
-                  setTimeout(sendDownloadComplete, 1000);
-                }
-              }
-              sendDownloadComplete();
-            }
-          };
-
-          xhr.send();
-        });
-      }
-
       function initBuild1() {
         console.log("🎮 Init build1: launching tap game + downloading build2");
 
@@ -157,12 +100,43 @@
             typeof SendMessage === "function"
           ) {
             console.log("✅ Unity instance ready. Starting build2 download.");
-            startBuild2Download();
+            downloadAndCacheBuild2();
             clearInterval(checkReady);
           } else {
             console.log("⏳ Waiting for Unity instance...");
           }
         }, 2000);
+      }
+
+      function downloadAndCacheBuild2() {
+        completedFiles = 0;
+
+        build2Files.forEach((url, idx) => {
+          fetch(url)
+            .then((response) => {
+              if (!response.ok) {
+                throw new Error(`Failed to fetch ${url}`);
+              }
+              return caches.open(build2UnityCacheKey).then((cache) => {
+                return cache.put(contentToCache[idx], response.clone());
+              });
+            })
+            .then(() => {
+              completedFiles++;
+              const percent = Math.round(
+                (completedFiles / build2Files.length) * 100
+              );
+              safeSendMessage("Code", "UpdateFill", percent.toString());
+              console.log(`✅ Cached ${contentToCache[idx]}`);
+              if (completedFiles === build2Files.length) {
+                console.log("✅ All build2 files downloaded & cached.");
+                safeSendMessage("Code", "DownloadComplete", build2URL);
+              }
+            })
+            .catch((err) => {
+              console.error(`Error caching ${url}:`, err);
+            });
+        });
       }
 
       console.log(
