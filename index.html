@@ -1,64 +1,117 @@
 <!DOCTYPE html>
 <html lang="en-us">
-  <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <title>Unity WebGL Player | Taunt_Build_1</title>
-    <link rel="shortcut icon" href="TemplateData/favicon.ico" />
-    <link rel="stylesheet" href="TemplateData/style.css" />
-    <link rel="manifest" href="manifest.webmanifest" />
-  </head>
-  <body>
-    <div id="unity-container">
-      <canvas id="unity-canvas" width="960" height="600" tabindex="-1"></canvas>
-      <div id="unity-loading-bar">
-        <div id="unity-logo"></div>
-        <div id="unity-progress-bar-empty">
-          <div id="unity-progress-bar-full"></div>
-        </div>
+
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <title>Unity WebGL Player | Taunt_Build_1</title>
+  <link rel="shortcut icon" href="TemplateData/favicon.ico" />
+  <link rel="stylesheet" href="TemplateData/style.css" />
+  <link rel="manifest" href="manifest.webmanifest" />
+</head>
+
+<body>
+  <div id="unity-container">
+    <canvas id="unity-canvas" width="960" height="600" tabindex="-1"></canvas>
+    <div id="unity-loading-bar">
+      <div id="unity-logo"></div>
+      <div id="unity-progress-bar-empty">
+        <div id="unity-progress-bar-full"></div>
       </div>
-      <div id="unity-warning"></div>
     </div>
-    <script>
-      window.addEventListener("load", function () {
-        if ("serviceWorker" in navigator) {
-          navigator.serviceWorker.register("ServiceWorker.js");
-        }
+    <div id="unity-warning"></div>
+  </div>
+
+
+  <script>
+    const build2URL = "https://spearonnear.github.io/SpearOnNearBattleRoyal/";
+    const build2UnityCacheKey = "Spear-Spear On Near-3.2"; // 👈 replace with key from build2 ServiceWorker.js
+
+    const contentToCache = [
+      "Build/tt.loader.js",
+      "Build/tt.framework.js.unityweb",
+      "Build/tt.data.unityweb",
+      "Build/tt.wasm.unityweb",
+      "TemplateData/style.css"
+
+    ];
+
+    // dynamically create full URLs
+    const build2Files = contentToCache.map(path => build2URL + path);
+
+    let loadedBytes = [];
+    let totalBytes = [];
+    let completedFiles = 0;
+
+    function safeSendMessage (goName, methodName, param) {
+      if (typeof SendMessage === "function") {
+        SendMessage(goName, methodName, param);
+      }
+    }
+
+    function startBuild2Download () {
+      loadedBytes = new Array(build2Files.length).fill(0);
+      totalBytes = new Array(build2Files.length).fill(1);
+      completedFiles = 0;
+
+      build2Files.forEach((fileUrl, idx) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("GET", fileUrl, true);
+        xhr.responseType = "blob";
+
+        xhr.onprogress = function (e) {
+          if (e.lengthComputable) {
+            loadedBytes[idx] = e.loaded;
+            totalBytes[idx] = e.total;
+            const percent = Math.round(
+              (loadedBytes.reduce((a, b) => a + b, 0) /
+                totalBytes.reduce((a, b) => a + b, 0)) *
+              100
+            );
+            safeSendMessage("Code", "UpdateFill", percent.toString());
+          }
+        };
+
+        xhr.onload = function () {
+          completedFiles++;
+          loadedBytes[idx] = totalBytes[idx];
+          if (completedFiles === build2Files.length) {
+            function sendDownloadComplete () {
+              if (typeof SendMessage === "function") {
+                SendMessage("Code", "DownloadComplete", build2URL);
+              } else {
+                setTimeout(sendDownloadComplete, 2000);
+              }
+            }
+            sendDownloadComplete();
+          }
+        };
+
+        xhr.send();
       });
+    }
+
+    function waitForUnityAndStart () {
+      const checkReady = setInterval(() => {
+        if (
+          typeof unityInstance !== "undefined" &&
+          unityInstance.Module &&
+          typeof SendMessage === "function"
+        ) {
+          startBuild2Download();
+          clearInterval(checkReady);
+        }
+      }, 1000);
+    }
+
+    function initBuild1 () {
+      console.log("🎮 Init build1: launching tap game + downloading build2");
 
       var container = document.querySelector("#unity-container");
       var canvas = document.querySelector("#unity-canvas");
       var loadingBar = document.querySelector("#unity-loading-bar");
       var progressBarFull = document.querySelector("#unity-progress-bar-full");
-      var warningBanner = document.querySelector("#unity-warning");
       var unityInstance = null;
-
-      // Shows a temporary message banner/ribbon for a few seconds, or
-      // a permanent error message on top of the canvas if type=='error'.
-      // If type=='warning', a yellow highlight color is used.
-      // Modify or remove this function to customize the visually presented
-      // way that non-critical warnings and error messages are presented to the
-      // user.
-      function unityShowBanner(msg, type) {
-        function updateBannerVisibility() {
-          warningBanner.style.display = warningBanner.children.length
-            ? "block"
-            : "none";
-        }
-        var div = document.createElement("div");
-        div.innerHTML = msg;
-        warningBanner.appendChild(div);
-        if (type == "error") div.style = "background: red; padding: 10px;";
-        else {
-          if (type == "warning")
-            div.style = "background: yellow; padding: 10px;";
-          setTimeout(function () {
-            warningBanner.removeChild(div);
-            updateBannerVisibility();
-          }, 5000);
-        }
-        updateBannerVisibility();
-      }
 
       var buildUrl = "Build";
       var loaderUrl = buildUrl + "/Taunt_Tap.loader.js";
@@ -70,24 +123,7 @@
         companyName: "DefaultCompany",
         productName: "Taunt_Build_1",
         productVersion: "0.1.1",
-        showBanner: unityShowBanner,
       };
-
-      // By default Unity keeps WebGL canvas render target size matched with
-      // the DOM size of the canvas element (scaled by window.devicePixelRatio)
-      // Set this to false if you want to decouple this synchronization from
-      // happening inside the engine, and you would instead like to size up
-      // the canvas DOM size and WebGL render target sizes yourself.
-      // config.matchWebGLToCanvasSize = false;
-
-      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-        // Mobile device style: fill the whole browser client area with the game canvas:
-        var meta = document.createElement("meta");
-        meta.name = "viewport";
-        meta.content =
-          "width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes";
-        document.getElementsByTagName("head")[0].appendChild(meta);
-      }
 
       loadingBar.style.display = "block";
 
@@ -100,7 +136,6 @@
           .then((instance) => {
             unityInstance = instance;
             window.SendMessage = unityInstance.SendMessage;
-            console.log("[MEAW] Unity instance created successfully");
             waitForUnityAndStart();
             loadingBar.style.display = "none";
           })
@@ -109,89 +144,23 @@
           });
       };
       document.body.appendChild(script);
+    }
 
-      const build2Files = [
-        "https://spearonnear.github.io/SpearOnNearBattleRoyal/Build/tt.data.unityweb",
-        "https://spearonnear.github.io/SpearOnNearBattleRoyal/Build/tt.wasm.unityweb",
-      ];
-
-      const build2URL = "https://spearonnear.github.io/SpearOnNearBattleRoyal/";
-
-      let loadedBytes = [0, 0];
-      let totalBytes = [1, 1]; // init to 1 to avoid div0
-
-      function safeSendMessage(goName, methodName, param) {
-        if (typeof SendMessage === "function") {
-          SendMessage(goName, methodName, param);
-        } else {
-          console.warn("Unity SendMessage not ready yet for " + methodName);
-        }
+    // check if build2 is already cached
+    caches.has(build2UnityCacheKey).then((cached) => {
+      if (cached) {
+        console.log("✅ Build2 already cached. Redirecting.");
+        window.location.href = build2URL;
+      } else {
+        console.log("⬇️ Build2 not cached yet. Loading build1.");
+        initBuild1();
       }
+    });
+  </script>
 
-      function startBuild2Download() {
-        build2Files.forEach((fileUrl, idx) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open("GET", fileUrl, true);
-          xhr.responseType = "blob";
 
-          xhr.onprogress = function (e) {
-            if (e.lengthComputable) {
-              loadedBytes[idx] = e.loaded;
-              totalBytes[idx] = e.total;
-              const percent = Math.round(
-                (loadedBytes.reduce((a, b) => a + b, 0) /
-                  totalBytes.reduce((a, b) => a + b, 0)) *
-                  100
-              );
-              /* console.log(`Build2 Combined Download Progress: ${percent}%`); */
-              safeSendMessage("Code", "UpdateFill", percent.toString());
-            }
-          };
 
-          xhr.onload = function () {
-            loadedBytes[idx] = totalBytes[idx]; // mark as fully done
-            if (
-              loadedBytes[0] === totalBytes[0] &&
-              loadedBytes[1] === totalBytes[1]
-            ) {
-              console.log("Build2 all files downloaded ✅");
-              function sendDownloadComplete() {
-                if (typeof SendMessage === "function") {
-                  /* console.log("✅ DownloadComplete sent to Unity"); */
-                  SendMessage("Code", "DownloadComplete", build2URL);
-                } else {
-                  /* console.warn(
-                    "Unity not ready yet for DownloadComplete, retrying..."
-                  ); */
-                  setTimeout(sendDownloadComplete, 2000);
-                }
-              }
-              sendDownloadComplete();
-            }
-          };
 
-          xhr.send();
-        });
-      }
+</body>
 
-      function waitForUnityAndStart() {
-        const checkReady = setInterval(() => {
-          if (
-            typeof unityInstance !== "undefined" &&
-            unityInstance.Module &&
-            typeof SendMessage === "function"
-          ) {
-            console
-              .log
-              /* "Unity + SendMessage are ready ✅ starting build2 download" */
-              ();
-            startBuild2Download();
-            clearInterval(checkReady);
-          } else {
-            /* console.log("Unity or SendMessage not ready yet… waiting…"); */
-          }
-        }, 2000);
-      }
-    </script>
-  </body>
 </html>
