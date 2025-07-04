@@ -102,7 +102,7 @@
         try {
           const response = await fetch(url);
           if (!response.ok) throw new Error(`HTTP error ${response.status}`);
-          await cache.put(path, response.clone());
+          await cache.put(url, response.clone());
           completed++;
           const percent = Math.round((completed / build2Files.length) * 100);
           safeSendMessage("Code", "UpdateFill", percent.toString());
