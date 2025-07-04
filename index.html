@@ -76,9 +76,17 @@
             completedFiles++;
             loadedBytes[idx] = totalBytes[idx];
 
-            caches.open(build2UnityCacheKey).then((cache) => {
-              cache.put(contentToCache[idx], new Response(xhr.response));
-            });
+            if (xhr.status === 200 && xhr.response) {
+              caches.open(build2UnityCacheKey).then((cache) => {
+                cache
+                  .put(contentToCache[idx], new Response(xhr.response))
+                  .then(() => {
+                    console.log(`✅ Cached: ${contentToCache[idx]}`);
+                  });
+              });
+            } else {
+              console.warn(`⚠️ Failed to download ${contentToCache[idx]}`);
+            }
 
             if (completedFiles === build2Files.length) {
               function sendDownloadComplete() {
@@ -86,7 +94,7 @@
                   console.log("✅ Build2 download complete.");
                   SendMessage("Code", "DownloadComplete", build2URL);
                 } else {
-                  setTimeout(sendDownloadComplete, 2000);
+                  setTimeout(sendDownloadComplete, 1000);
                 }
               }
               sendDownloadComplete();
@@ -161,6 +169,35 @@
         "🎮 Always starting build1 — caching handled by build2 itself."
       );
       initBuild1();
+
+      function dropAll() {
+        // 🗑️ wipe the browser CacheStorage
+        caches
+          .delete(build2UnityCacheKey)
+          .then((success) => {
+            if (success) {
+              console.log(`🗑️ build2 cache "${build2UnityCacheKey}" deleted.`);
+            } else {
+              console.warn(
+                `⚠️ build2 cache "${build2UnityCacheKey}" not found.`
+              );
+            }
+          })
+          .catch((err) => {
+            console.error("Error deleting build2 cache: ", err);
+          });
+
+        // 🧹 wipe blobs in memory
+        if (loadedBytes && loadedBytes.length) {
+          loadedBytes = [];
+        }
+        if (totalBytes && totalBytes.length) {
+          totalBytes = [];
+        }
+        completedFiles = 0;
+
+        console.log("🧹 in-memory blobs and counters cleared.");
+      }
     </script>
   </body>
 </html>
