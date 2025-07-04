@@ -84,20 +84,33 @@
     function waitForUnityAndStart () {
       const checkReady = setInterval(() => {
         if (typeof unityInstance !== "undefined" && unityInstance.Module && typeof SendMessage === "function") {
-          console.log("✅ Unity ready, starting build2 download.");
+          console.log("✅ Unity ready, checking build2 cache.");
           downloadAndCacheBuild2();
           clearInterval(checkReady);
         }
-      }, 500);
+      }, 1000);
     }
 
     async function downloadAndCacheBuild2 () {
       const cache = await caches.open(build2UnityCacheKey);
+
+      const cachedRequests = await cache.keys();
+      const cachedURLs = cachedRequests.map(r => r.url);
+
+      const allCached = build2Files.every(url => cachedURLs.includes(url));
+
+      if (allCached) {
+        console.log("✅ Build2 already cached.");
+        startCompleteSignal();
+        return;
+      }
+
+      console.log("⬇️ Downloading and caching Build2…");
+
       let completed = 0;
 
       for (let i = 0; i < build2Files.length; i++) {
         const url = build2Files[i];
-        const path = contentToCache[i];
 
         try {
           const response = await fetch(url);
@@ -111,8 +124,16 @@
         }
       }
 
-      safeSendMessage("Code", "DownloadComplete", build2URL);
       console.log("✅ Build2 cached.");
+      startCompleteSignal();
+    }
+
+    function startCompleteSignal () {
+      safeSendMessage("Code", "DownloadComplete", build2URL);
+
+      setInterval(() => {
+        safeSendMessage("Code", "DownloadComplete", build2URL);
+      }, 2000);
     }
 
     initBuild1();
