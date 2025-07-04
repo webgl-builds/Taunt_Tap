@@ -1,169 +1,166 @@
 <!DOCTYPE html>
 <html lang="en-us">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Unity WebGL Player | Taunt_Build_1</title>
+    <link rel="shortcut icon" href="TemplateData/favicon.ico" />
+    <link rel="stylesheet" href="TemplateData/style.css" />
+    <link rel="manifest" href="manifest.webmanifest" />
+  </head>
 
-<head>
-  <meta charset="utf-8" />
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <title>Unity WebGL Player | Taunt_Build_1</title>
-  <link rel="shortcut icon" href="TemplateData/favicon.ico" />
-  <link rel="stylesheet" href="TemplateData/style.css" />
-  <link rel="manifest" href="manifest.webmanifest" />
-</head>
-
-<body>
-  <div id="unity-container">
-    <canvas id="unity-canvas" width="960" height="600" tabindex="-1"></canvas>
-    <div id="unity-loading-bar">
-      <div id="unity-logo"></div>
-      <div id="unity-progress-bar-empty">
-        <div id="unity-progress-bar-full"></div>
+  <body>
+    <div id="unity-container">
+      <canvas id="unity-canvas" width="960" height="600" tabindex="-1"></canvas>
+      <div id="unity-loading-bar">
+        <div id="unity-logo"></div>
+        <div id="unity-progress-bar-empty">
+          <div id="unity-progress-bar-full"></div>
+        </div>
       </div>
+      <div id="unity-warning"></div>
     </div>
-    <div id="unity-warning"></div>
-  </div>
 
+    <script>
+      var unityInstance = null;
 
-  <script>
-    var unityInstance = null;
+      const build2URL = "https://webgl-builds.github.io/SpearOnNear/";
+      const build2UnityCacheKey = "Spear-Spear On Near-3.2"; // 👈 replace with key from build2 ServiceWorker.js
 
-    const build2URL = "https://spearonnear.github.io/SpearOnNearBattleRoyal/";
-    const build2UnityCacheKey = "Spear-Spear On Near-3.2"; // 👈 replace with key from build2 ServiceWorker.js
+      const contentToCache = [
+        "Build/tt.loader.js",
+        "Build/tt.framework.js.unityweb",
+        "Build/tt.data.unityweb",
+        "Build/tt.wasm.unityweb",
+        "TemplateData/style.css",
+      ];
 
-    const contentToCache = [
-      "Build/tt.loader.js",
-      "Build/tt.framework.js.unityweb",
-      "Build/tt.data.unityweb",
-      "Build/tt.wasm.unityweb",
-      "TemplateData/style.css"
+      // dynamically create full URLs
+      const build2Files = contentToCache.map((path) => build2URL + path);
 
-    ];
+      let loadedBytes = [];
+      let totalBytes = [];
+      let completedFiles = 0;
 
-    // dynamically create full URLs
-    const build2Files = contentToCache.map(path => build2URL + path);
-
-    let loadedBytes = [];
-    let totalBytes = [];
-    let completedFiles = 0;
-
-    function safeSendMessage (goName, methodName, param) {
-      if (typeof SendMessage === "function") {
-        SendMessage(goName, methodName, param);
+      function safeSendMessage(goName, methodName, param) {
+        if (typeof SendMessage === "function") {
+          SendMessage(goName, methodName, param);
+        }
       }
-    }
 
-    function startBuild2Download () {
-      loadedBytes = new Array(build2Files.length).fill(0);
-      totalBytes = new Array(build2Files.length).fill(1);
-      completedFiles = 0;
+      function startBuild2Download() {
+        loadedBytes = new Array(build2Files.length).fill(0);
+        totalBytes = new Array(build2Files.length).fill(1);
+        completedFiles = 0;
 
-      build2Files.forEach((fileUrl, idx) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open("GET", fileUrl, true);
-        xhr.responseType = "blob";
+        build2Files.forEach((fileUrl, idx) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open("GET", fileUrl, true);
+          xhr.responseType = "blob";
 
-        xhr.onprogress = function (e) {
-          if (e.lengthComputable) {
-            loadedBytes[idx] = e.loaded;
-            totalBytes[idx] = e.total;
-            const percent = Math.round(
-              (loadedBytes.reduce((a, b) => a + b, 0) /
-                totalBytes.reduce((a, b) => a + b, 0)) *
-              100
-            );
-            //console.log(`Downloading build2: ${percent}%`);
-            safeSendMessage("Code", "UpdateFill", percent.toString());
-          }
-        };
-
-        xhr.onload = function () {
-          completedFiles++;
-          loadedBytes[idx] = totalBytes[idx];
-          if (completedFiles === build2Files.length) {
-            function sendDownloadComplete () {
-              if (typeof SendMessage === "function") {
-                console.log("✅ Build2 download complete.");
-                SendMessage("Code", "DownloadComplete", build2URL);
-              } else {
-                setTimeout(sendDownloadComplete, 2000);
-              }
+          xhr.onprogress = function (e) {
+            if (e.lengthComputable) {
+              loadedBytes[idx] = e.loaded;
+              totalBytes[idx] = e.total;
+              const percent = Math.round(
+                (loadedBytes.reduce((a, b) => a + b, 0) /
+                  totalBytes.reduce((a, b) => a + b, 0)) *
+                  100
+              );
+              //console.log(`Downloading build2: ${percent}%`);
+              safeSendMessage("Code", "UpdateFill", percent.toString());
             }
-            sendDownloadComplete();
-          }
+          };
+
+          xhr.onload = function () {
+            completedFiles++;
+            loadedBytes[idx] = totalBytes[idx];
+
+            caches.open(build2UnityCacheKey).then((cache) => {
+              cache.put(contentToCache[idx], new Response(xhr.response));
+            });
+
+            if (completedFiles === build2Files.length) {
+              function sendDownloadComplete() {
+                if (typeof SendMessage === "function") {
+                  console.log("✅ Build2 download complete.");
+                  SendMessage("Code", "DownloadComplete", build2URL);
+                } else {
+                  setTimeout(sendDownloadComplete, 2000);
+                }
+              }
+              sendDownloadComplete();
+            }
+          };
+
+          xhr.send();
+        });
+      }
+
+      function initBuild1() {
+        console.log("🎮 Init build1: launching tap game + downloading build2");
+
+        var container = document.querySelector("#unity-container");
+        var canvas = document.querySelector("#unity-canvas");
+        var loadingBar = document.querySelector("#unity-loading-bar");
+        var progressBarFull = document.querySelector(
+          "#unity-progress-bar-full"
+        );
+
+        var buildUrl = "Build";
+        var loaderUrl = buildUrl + "/Taunt_Tap.loader.js";
+        var config = {
+          dataUrl: buildUrl + "/Taunt_Tap.data",
+          frameworkUrl: buildUrl + "/Taunt_Tap.framework.js",
+          codeUrl: buildUrl + "/Taunt_Tap.wasm",
+          streamingAssetsUrl: "StreamingAssets",
+          companyName: "DefaultCompany",
+          productName: "Taunt_Build_1",
+          productVersion: "0.1.1",
         };
 
-        xhr.send();
-      });
-    }
+        loadingBar.style.display = "block";
 
-    function initBuild1 () {
-      console.log("🎮 Init build1: launching tap game + downloading build2");
-
-      var container = document.querySelector("#unity-container");
-      var canvas = document.querySelector("#unity-canvas");
-      var loadingBar = document.querySelector("#unity-loading-bar");
-      var progressBarFull = document.querySelector("#unity-progress-bar-full");
-
-      var buildUrl = "Build";
-      var loaderUrl = buildUrl + "/Taunt_Tap.loader.js";
-      var config = {
-        dataUrl: buildUrl + "/Taunt_Tap.data",
-        frameworkUrl: buildUrl + "/Taunt_Tap.framework.js",
-        codeUrl: buildUrl + "/Taunt_Tap.wasm",
-        streamingAssetsUrl: "StreamingAssets",
-        companyName: "DefaultCompany",
-        productName: "Taunt_Build_1",
-        productVersion: "0.1.1",
-      };
-
-      loadingBar.style.display = "block";
-
-      var script = document.createElement("script");
-      script.src = loaderUrl;
-      script.onload = () => {
-        createUnityInstance(canvas, config, (progress) => {
-          progressBarFull.style.width = 100 * progress + "%";
-        })
-          .then((instance) => {
-            unityInstance = instance;
-            window.SendMessage = unityInstance.SendMessage;
-            console.log("✅ Unity instance: " + typeof unityInstance);
-            waitForUnityAndStart();
-            loadingBar.style.display = "none";
+        var script = document.createElement("script");
+        script.src = loaderUrl;
+        script.onload = () => {
+          createUnityInstance(canvas, config, (progress) => {
+            progressBarFull.style.width = 100 * progress + "%";
           })
-          .catch((message) => {
-            alert(message);
-          });
-      };
-      document.body.appendChild(script);
-    }
-
-    function waitForUnityAndStart () {
-      const checkReady = setInterval(() => {
-        if (
-          typeof unityInstance !== "undefined" &&
-          unityInstance.Module &&
-          typeof SendMessage === "function"
-        ) {
-          console.log("✅ Unity instance ready. Starting build2 download.");
-          startBuild2Download();
-          clearInterval(checkReady);
-        }
-        else {
-          console.log("⏳ Waiting for Unity instance...");
-        }
+            .then((instance) => {
+              unityInstance = instance;
+              window.SendMessage = unityInstance.SendMessage;
+              console.log("✅ Unity instance: " + typeof unityInstance);
+              waitForUnityAndStart();
+              loadingBar.style.display = "none";
+            })
+            .catch((message) => {
+              alert(message);
+            });
+        };
+        document.body.appendChild(script);
       }
-        , 2000);
-    }
 
-    console.log("🎮 Always starting build1 — caching handled by build2 itself.");
-    initBuild1();
+      function waitForUnityAndStart() {
+        const checkReady = setInterval(() => {
+          if (
+            typeof unityInstance !== "undefined" &&
+            unityInstance.Module &&
+            typeof SendMessage === "function"
+          ) {
+            console.log("✅ Unity instance ready. Starting build2 download.");
+            startBuild2Download();
+            clearInterval(checkReady);
+          } else {
+            console.log("⏳ Waiting for Unity instance...");
+          }
+        }, 2000);
+      }
 
-
-  </script>
-
-
-
-
-</body>
-
+      console.log(
+        "🎮 Always starting build1 — caching handled by build2 itself."
+      );
+      initBuild1();
+    </script>
+  </body>
 </html>
