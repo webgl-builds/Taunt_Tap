@@ -1,149 +1,202 @@
 <!DOCTYPE html>
 <html lang="en-us">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Unity WebGL Player | Taunt_Build_1</title>
+    <link rel="shortcut icon" href="TemplateData/favicon.ico" />
+    <link rel="stylesheet" href="TemplateData/style.css" />
+    <link rel="manifest" href="manifest.webmanifest" />
+  </head>
 
-<head>
-  <meta charset="utf-8" />
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <title>Unity WebGL Player | Taunt_Build_1</title>
-  <link rel="shortcut icon" href="TemplateData/favicon.ico" />
-  <link rel="stylesheet" href="TemplateData/style.css" />
-  <link rel="manifest" href="manifest.webmanifest" />
-</head>
-
-<body>
-  <div id="unity-container">
-    <canvas id="unity-canvas" width="960" height="600" tabindex="-1"></canvas>
-    <div id="unity-loading-bar">
-      <div id="unity-logo"></div>
-      <div id="unity-progress-bar-empty">
-        <div id="unity-progress-bar-full"></div>
+  <body>
+    <div id="unity-container">
+      <canvas id="unity-canvas" width="960" height="600" tabindex="-1"></canvas>
+      <div id="unity-loading-bar">
+        <div id="unity-logo"></div>
+        <div id="unity-progress-bar-empty">
+          <div id="unity-progress-bar-full"></div>
+        </div>
       </div>
+      <div id="unity-warning"></div>
     </div>
-    <div id="unity-warning"></div>
-  </div>
 
-  <script>
-    var unityInstance = null;
-
-    const build2URL = "https://webgl-builds.github.io/SpearOnNear/";
-    const build2UnityCacheKey = "Spear-Spear On Near-3.2";
-
-    const contentToCache = [
-      "Build/tt.loader.js",
-      "Build/tt.framework.js.unityweb",
-      "Build/tt.data.unityweb",
-      "Build/tt.wasm.unityweb",
-      "TemplateData/style.css",
-    ];
-
-    const build2Files = contentToCache.map((path) => build2URL + path);
-
-    function safeSendMessage (goName, methodName, param) {
-      if (typeof SendMessage === "function") {
-        SendMessage(goName, methodName, param);
+    <script>
+      var unityInstance = null;
+      // Register Build2 ServiceWorker from Build1
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker
+          .register("/game/ServiceWorker.js", { scope: "/game/" })
+          .then(() =>
+            console.log("✅ Build2 ServiceWorker registered from Build1.")
+          );
       }
-    }
 
-    function initBuild1 () {
-      const container = document.querySelector("#unity-container");
-      const canvas = document.querySelector("#unity-canvas");
-      const loadingBar = document.querySelector("#unity-loading-bar");
-      const progressBarFull = document.querySelector("#unity-progress-bar-full");
+      const build2URL =
+        "https://taunt-full-game-dev.s3.eu-north-1.amazonaws.com/game/";
+      const build2UnityCacheKey = "Turnt Gaming-Taunt Battleworld-1.0";
+      const build2UnityCacheKeyForData =
+        "UnityCache_Turnt Gaming_Taunt Battleworld";
 
-      const buildUrl = "Build";
-      const loaderUrl = buildUrl + "/Taunt_Tap.loader.js";
-      const config = {
-        dataUrl: buildUrl + "/Taunt_Tap.data",
-        frameworkUrl: buildUrl + "/Taunt_Tap.framework.js",
-        codeUrl: buildUrl + "/Taunt_Tap.wasm",
-        streamingAssetsUrl: "StreamingAssets",
-        companyName: "DefaultCompany",
-        productName: "Taunt_Build_1",
-        productVersion: "0.1.1",
-      };
+      const contentToCache = [
+        "Build/Taunt_Main.data",
+        "Build/Taunt_Main.loader.js",
+        "Build/Taunt_Main.framework.js",
+        "Build/Taunt_Main.wasm",
+        "TemplateData/style.css",
+      ];
 
-      loadingBar.style.display = "block";
+      const build2Files = contentToCache.map((path) => build2URL + path);
 
-      const script = document.createElement("script");
-      script.src = loaderUrl;
-      script.onload = () => {
-        createUnityInstance(canvas, config, (progress) => {
-          progressBarFull.style.width = 100 * progress + "%";
-        })
-          .then((instance) => {
-            unityInstance = instance;
-            window.SendMessage = unityInstance.SendMessage;
-            waitForUnityAndStart();
-            loadingBar.style.display = "none";
+      function safeSendMessage(goName, methodName, param) {
+        if (typeof SendMessage === "function") {
+          SendMessage(goName, methodName, param);
+        }
+      }
+
+      function initBuild1() {
+        const container = document.querySelector("#unity-container");
+        const canvas = document.querySelector("#unity-canvas");
+        const loadingBar = document.querySelector("#unity-loading-bar");
+        const progressBarFull = document.querySelector(
+          "#unity-progress-bar-full"
+        );
+
+        const buildUrl = "Build";
+        const loaderUrl = buildUrl + "/Taunt_Tap.loader.js";
+        const config = {
+          dataUrl: buildUrl + "/Taunt_Tap.data",
+          frameworkUrl: buildUrl + "/Taunt_Tap.framework.js",
+          codeUrl: buildUrl + "/Taunt_Tap.wasm",
+          streamingAssetsUrl: "StreamingAssets",
+          companyName: "DefaultCompany",
+          productName: "Taunt_Build_1",
+          productVersion: "0.1.1",
+        };
+
+        loadingBar.style.display = "block";
+
+        const script = document.createElement("script");
+        script.src = loaderUrl;
+        script.onload = () => {
+          createUnityInstance(canvas, config, (progress) => {
+            progressBarFull.style.width = 100 * progress + "%";
           })
-          .catch((message) => alert(message));
-      };
-      document.body.appendChild(script);
-    }
+            .then((instance) => {
+              unityInstance = instance;
+              window.SendMessage = unityInstance.SendMessage;
+              waitForUnityAndStart();
+              loadingBar.style.display = "none";
+            })
+            .catch((message) => alert(message));
+        };
+        document.body.appendChild(script);
+      }
 
-    function waitForUnityAndStart () {
-      const checkReady = setInterval(() => {
-        if (typeof unityInstance !== "undefined" && unityInstance.Module && typeof SendMessage === "function") {
-          console.log("✅ Unity ready, checking build2 cache.");
-          downloadAndCacheBuild2();
-          clearInterval(checkReady);
+      function waitForUnityAndStart() {
+        const checkReady = setInterval(() => {
+          if (
+            typeof unityInstance !== "undefined" &&
+            unityInstance.Module &&
+            typeof SendMessage === "function"
+          ) {
+            console.log("✅ Unity ready, checking build2 cache.");
+            downloadAndCacheBuild2();
+            clearInterval(checkReady);
+          }
+        }, 1000);
+      }
+
+      async function downloadAndCacheBuild2() {
+        const cache = await caches.open(build2UnityCacheKey);
+        const cacheData = await caches.open(build2UnityCacheKeyForData);
+
+        const cachedRequests = await cache.keys();
+        const cachedURLs = cachedRequests.map((r) => r.url);
+
+        const allCached = contentToCache.every((url) =>
+          cachedURLs.includes(build2URL + url)
+        );
+        const dataCached = await cacheData.match(build2URL + contentToCache[0]);
+        if (allCached) {
+          if (dataCached) {
+            console.log("✅ Build2 already cached, skipping download.");
+          } else {
+            console.log(
+              "⚠️ Build2 data not cached, duplicating cache for data."
+            );
+            await duplicateUnityCacheKey();
+          }
+
+          startCompleteSignal();
+          return;
         }
-      }, 1000);
-    }
 
-    async function downloadAndCacheBuild2 () {
-      const cache = await caches.open(build2UnityCacheKey);
+        console.log("⬇️ Downloading and caching Build2…");
 
-      const cachedRequests = await cache.keys();
-      const cachedURLs = cachedRequests.map(r => r.url);
+        let completed = 0;
 
-      const allCached = build2Files.every(url => cachedURLs.includes(url));
+        for (let i = 0; i < contentToCache.length; i++) {
+          const url = build2URL + contentToCache[i];
+          console.log(`Caching ${url}...`);
+          try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`HTTP error ${response.status}`);
+            await cache.put(url, response.clone());
+            if (url.endsWith(".data")) {
+              // Special handling for .data file
+              console.log(`Caching ${url} in separate cache for data.`);
+              await cacheData.put(url, response.clone());
+            }
 
-      if (allCached) {
-        console.log("✅ Build2 already cached.");
+            completed++;
+            const percent = Math.round((completed / build2Files.length) * 100);
+            safeSendMessage("Code", "UpdateFill", percent.toString());
+          } catch (err) {
+            console.error(`❌ Error caching ${url}`, err);
+          }
+        }
+
+        console.log("✅ Build2 cached.");
         startCompleteSignal();
-        return;
       }
 
-      console.log("⬇️ Downloading and caching Build2…");
+      function startCompleteSignal() {
+        safeSendMessage("Code", "DownloadComplete", build2URL + "index.html");
 
-      let completed = 0;
+        setInterval(() => {
+          safeSendMessage("Code", "DownloadComplete", build2URL + "index.html");
+        }, 2000);
+      }
 
-      for (let i = 0; i < build2Files.length; i++) {
-        const url = build2Files[i];
+      initBuild1();
 
-        try {
-          const response = await fetch(url);
-          if (!response.ok) throw new Error(`HTTP error ${response.status}`);
-          await cache.put(url, response.clone());
-          completed++;
-          const percent = Math.round((completed / build2Files.length) * 100);
-          safeSendMessage("Code", "UpdateFill", percent.toString());
-        } catch (err) {
-          console.error(`❌ Error caching ${url}`, err);
+      function dropAll() {
+        caches.delete(build2UnityCacheKey).then((success) => {
+          if (success)
+            console.log(`🗑️ Cache "${build2UnityCacheKey}" deleted.`);
+        });
+        caches.delete(build2UnityCacheKeyForData).then((success) => {
+          if (success)
+            console.log(`🗑️ Cache "${build2UnityCacheKeyForData}" deleted.`);
+        });
+      }
+
+      async function duplicateUnityCacheKey() {
+        const cache = await caches.open(build2UnityCacheKey); // or whatever your cache name is
+
+        const response = await cache.match(build2URL + contentToCache[0]);
+        if (!response) {
+          console.error(`No cache found for key: ${build2UnityCacheKey}`);
+          return;
         }
+
+        const cacheNew = await caches.open(build2UnityCacheKeyForData);
+        await cacheNew.put(build2URL + contentToCache[0], response.clone());
+        console.log(
+          `✅ Cached ${build2UnityCacheKey} duplicated to ${build2UnityCacheKeyForData}`
+        );
       }
-
-      console.log("✅ Build2 cached.");
-      startCompleteSignal();
-    }
-
-    function startCompleteSignal () {
-      safeSendMessage("Code", "DownloadComplete", build2URL);
-
-      setInterval(() => {
-        safeSendMessage("Code", "DownloadComplete", build2URL);
-      }, 2000);
-    }
-
-    initBuild1();
-
-    function dropAll () {
-      caches.delete(build2UnityCacheKey).then((success) => {
-        if (success) console.log(`🗑️ Cache "${build2UnityCacheKey}" deleted.`);
-      });
-    }
-  </script>
-</body>
-
+    </script>
+  </body>
 </html>
